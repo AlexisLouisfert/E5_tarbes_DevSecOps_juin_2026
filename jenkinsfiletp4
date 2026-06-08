@@ -1,13 +1,49 @@
 pipeline {
-
     agent any
 
+    /*
+    Déclaration des paramètres.
+    Ils apparaîtront dans Jenkins avec l'option :
+    "Build with Parameters"
+    */
+
     parameters {
-        string(name: 'NAME', defaultValue: 'DevOps User', description: 'Please tell me your name')
-        text(name: 'DESC', defaultValue: 'Pipeline CI/CD Jenkins GitHub', description: 'Description du Job')
-        booleanParam(name: 'SKIP_TEST', defaultValue: false, description: 'Skip running Tests ?')
-        choice(name: 'BRANCH', choices: ['main', 'dev', 'test'], description: 'Choose Git branch')
-        password(name: 'SONAR_SERVER_PWD', description: 'Enter SONAR password')
+
+        string(
+            name: 'NAME',
+            defaultValue: 'DevOps User',
+            description: 'Please tell me your name'
+        )
+
+
+        text(
+            name: 'DESC',
+            defaultValue: 'Pipeline CI/CD Jenkins GitHub',
+            description: 'Description du Job'
+        )
+
+
+        booleanParam(
+            name: 'SKIP_TEST',
+            defaultValue: false,
+            description: 'Skip running Tests ?'
+        )
+
+
+        choice(
+            name: 'BRANCH',
+            choices: [
+                'main',
+                'dev',
+                'test'
+            ],
+            description: 'Choose Git branch'
+        )
+
+        password(
+            name: 'SONAR_SERVER_PWD',
+            description: 'Enter SONAR password'
+        )
     }
 
     environment {
@@ -17,6 +53,11 @@ pipeline {
     }
 
     stages {
+
+        /*
+        Affichage des paramètres envoyés
+        par l'utilisateur
+        */
 
         stage('01 - PRINT PARAMETERS') {
             steps {
@@ -30,6 +71,10 @@ pipeline {
             }
         }
 
+        /*
+        Récupération du projet depuis Github
+        */
+
         stage('02 - CHECKOUT GITHUB') {
             steps {
                 echo "Downloading source code..."
@@ -38,15 +83,24 @@ pipeline {
             }
         }
 
+        /*
+        Compilation de l'application
+        */
+
         stage('03 - BUILD APPLICATION') {
             steps {
                 echo "Building Application"
                 bat """
                 echo Compilation en cours...
-                mvnw.cmd clean package
+                mvn clean package
                 """
             }
         }
+
+        /*
+        Tests unitaires
+        Le stage sera ignoré si SKIP_TEST=true
+        */
 
         stage('04 - RUN TESTS') {
             when {
@@ -55,21 +109,29 @@ pipeline {
             steps {
                 echo "Running Tests"
                 bat """
-                mvnw.cmd test
+                mvn test
                 """
             }
         }
+
+        /*
+        Analyse qualité SonarQube
+        */
 
         stage('05 - SONARQUBE ANALYSIS') {
             steps {
                 echo "Scanning source code"
                 bat """
-                mvnw.cmd sonar:sonar ^
+                mvn sonar:sonar ^
                 -Dsonar.host.url=${SONAR_URL} ^
                 -Dsonar.login=${params.SONAR_SERVER_PWD}
                 """
             }
         }
+
+        /*
+        Création image Docker
+        */
 
         stage('06 - DOCKER BUILD') {
             steps {
@@ -79,6 +141,10 @@ pipeline {
                 """
             }
         }
+
+        /*
+        Déploiement
+        */
 
         stage('07 - DEPLOY') {
             steps {
@@ -95,6 +161,10 @@ pipeline {
         }
     }
 
+    /*
+    Actions exécutées à la fin
+    */
+
     post {
         success {
             echo """
@@ -104,6 +174,7 @@ pipeline {
             =========================
             """
         }
+
         failure {
             echo """
             =========================
