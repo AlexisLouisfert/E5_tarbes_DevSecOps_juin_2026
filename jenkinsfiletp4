@@ -1,49 +1,20 @@
 pipeline {
+
     agent any
 
-    /*
-    Déclaration des paramètres.
-    Ils apparaîtront dans Jenkins avec l'option :
-    "Build with Parameters"
+    /* C'EST ICI LA MAGIE : 
+    Jenkins va télécharger Maven tout seul grâce à cette ligne 
     */
+    tools {
+        maven 'Maven3'
+    }
 
     parameters {
-
-        string(
-            name: 'NAME',
-            defaultValue: 'DevOps User',
-            description: 'Please tell me your name'
-        )
-
-
-        text(
-            name: 'DESC',
-            defaultValue: 'Pipeline CI/CD Jenkins GitHub',
-            description: 'Description du Job'
-        )
-
-
-        booleanParam(
-            name: 'SKIP_TEST',
-            defaultValue: false,
-            description: 'Skip running Tests ?'
-        )
-
-
-        choice(
-            name: 'BRANCH',
-            choices: [
-                'main',
-                'dev',
-                'test'
-            ],
-            description: 'Choose Git branch'
-        )
-
-        password(
-            name: 'SONAR_SERVER_PWD',
-            description: 'Enter SONAR password'
-        )
+        string(name: 'NAME', defaultValue: 'DevOps User', description: 'Please tell me your name')
+        text(name: 'DESC', defaultValue: 'Pipeline CI/CD Jenkins GitHub', description: 'Description du Job')
+        booleanParam(name: 'SKIP_TEST', defaultValue: false, description: 'Skip running Tests ?')
+        choice(name: 'BRANCH', choices: ['main', 'dev', 'test'], description: 'Choose Git branch')
+        password(name: 'SONAR_SERVER_PWD', description: 'Enter SONAR password')
     }
 
     environment {
@@ -54,26 +25,12 @@ pipeline {
 
     stages {
 
-        /*
-        Affichage des paramètres envoyés
-        par l'utilisateur
-        */
-
         stage('01 - PRINT PARAMETERS') {
             steps {
                 echo "Hello ${params.NAME}"
-                echo """
-                Job Description:
-                ${params.DESC}
-                """
                 echo "Branch Selected : ${params.BRANCH}"
-                echo "Skip Test : ${params.SKIP_TEST}"
             }
         }
-
-        /*
-        Récupération du projet depuis Github
-        */
 
         stage('02 - CHECKOUT GITHUB') {
             steps {
@@ -82,10 +39,6 @@ pipeline {
                 url: 'https://github.com/AlexisLouisfert/E5_tarbes_DevSecOps_juin_2026.git'
             }
         }
-
-        /*
-        Compilation de l'application
-        */
 
         stage('03 - BUILD APPLICATION') {
             steps {
@@ -96,11 +49,6 @@ pipeline {
                 """
             }
         }
-
-        /*
-        Tests unitaires
-        Le stage sera ignoré si SKIP_TEST=true
-        */
 
         stage('04 - RUN TESTS') {
             when {
@@ -114,10 +62,6 @@ pipeline {
             }
         }
 
-        /*
-        Analyse qualité SonarQube
-        */
-
         stage('05 - SONARQUBE ANALYSIS') {
             steps {
                 echo "Scanning source code"
@@ -129,10 +73,6 @@ pipeline {
             }
         }
 
-        /*
-        Création image Docker
-        */
-
         stage('06 - DOCKER BUILD') {
             steps {
                 echo "Creating Docker image"
@@ -141,10 +81,6 @@ pipeline {
                 """
             }
         }
-
-        /*
-        Déploiement
-        */
 
         stage('07 - DEPLOY') {
             steps {
@@ -161,27 +97,12 @@ pipeline {
         }
     }
 
-    /*
-    Actions exécutées à la fin
-    */
-
     post {
         success {
-            echo """
-            =========================
-            PIPELINE SUCCESS
-            Application deployed
-            =========================
-            """
+            echo "========================= PIPELINE SUCCESS ========================="
         }
-
         failure {
-            echo """
-            =========================
-            PIPELINE FAILED
-            Please check logs
-            =========================
-            """
+            echo "========================= PIPELINE FAILED ========================="
         }
     }
 }
