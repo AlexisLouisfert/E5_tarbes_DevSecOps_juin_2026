@@ -110,7 +110,7 @@ pipeline {
 
 
                 git branch: "${params.BRANCH}",
-                url: 'https://github.com/AlexisLouisfert/E5_tarbes_DevSecOps_juin_2026.git
+                url: 'https://github.com/AlexisLouisfert/E5_tarbes_DevSecOps_juin_2026.git'
 
 
             }
