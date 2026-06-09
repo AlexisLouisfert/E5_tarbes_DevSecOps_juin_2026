@@ -65,7 +65,7 @@ pipeline {
             steps {
                 echo "Scanning for vulnerabilities with Trivy..."
                 bat """
-                docker run --rm -v "%cd%:/workspace" aquasec/trivy:latest fs /workspace
+                docker run --rm -v "%cd%:/workspace" aquasec/trivy:latest fs /workspace/target
                 """
             }
         }
