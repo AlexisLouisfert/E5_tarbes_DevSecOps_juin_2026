@@ -1,0 +1,148 @@
+pipeline {
+
+    agent any
+
+    /* Déclaration de Maven pour l'auto-installation */
+    tools {
+        maven 'Maven3'
+    }
+
+    parameters {
+        string(name: 'NAME', defaultValue: 'DevOps User', description: 'Please tell me your name')
+        text(name: 'DESC', defaultValue: 'Pipeline CI/CD Jenkins GitHub', description: 'Description du Job')
+        booleanParam(name: 'SKIP_TEST', defaultValue: false, description: 'Skip running Tests ?')
+        choice(name: 'BRANCH', choices: ['main', 'dev', 'test'], description: 'Choose Git branch')
+    }
+
+    environment {
+        APP_NAME = "web-app"
+        DOCKER_IMAGE = "mydockerhub/web-app"
+        GITHUB_REPO = "https://github.com/AlexisLouisfert/E5_tarbes_DevSecOps_juin_2026.git"
+        TRIVY_EXE = "C:\\ProgramData\\chocolatey\\bin\\trivy.exe" 
+        SNYK_EXE = "C:\\ProgramData\\chocolatey\\bin\\snyk.exe" 
+    }
+
+    stages {
+
+        stage('01 - PRINT PARAMETERS') {
+            steps {
+                echo "Hello ${params.NAME}"
+                echo "Description: ${params.DESC}"
+                echo "Branch Selected : ${params.BRANCH}"
+                echo "Skip Test: ${params.SKIP_TEST}"
+                echo "Skip Trivy: ${params.SKIP_TRIVY}"
+            }
+        }
+
+        stage('02 - CHECK TOOLS') { 
+            steps { 
+                bat """         
+                echo ===== MAVEN ===== 
+                mvn -version                           
+                echo ===== DOCKER ===== 
+                docker --version                           
+                echo ===== TRIVY ===== 
+                "%TRIVY_EXE%" --version 
+                echo ===== SNYK ===== 
+                "%SNYK_EXE%" --version
+                """
+            }
+        }
+
+        stage('03 - CHECKOUT GITHUB') {
+            steps {
+                echo "Downloading source code..."
+                git branch: "${params.BRANCH}",
+                url: "${GITHUB_REPO}"
+            }
+        }
+
+        stage('04 - BUILD APPLICATION') {
+            steps {
+                echo "Building Application"
+                bat """
+                echo Compilation en cours...
+                mvn clean package -DskipTests=true
+                """
+            }
+        }
+
+        stage('05 - RUN TESTS') {
+            when {
+                expression { return params.SKIP_TEST == false }
+            }
+            steps {
+                echo "Running Tests"
+                bat """
+                mvn test
+                """
+            }
+        }
+
+        stage('06 - DOCKER BUILD') {
+            steps {
+                echo "Creating Docker image"
+                bat """
+                docker build -t ${DOCKER_IMAGE}:latest .
+                """
+            }
+        }
+
+        stage('07 - TRIVY SECURITY SCAN') {
+            steps {
+                echo "Analyse des failles avec Trivy (Bloquant)"
+                bat """
+                "%TRIVY_EXE%" fs target
+                """
+            }
+        }
+
+        stage('08 - SNYK OPEN SOURCE SCAN') {
+            steps {
+                echo "Analyse des dependances Maven avec Snyk..."
+                withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
+                    bat """
+                    "%SNYK_EXE%" auth %SNYK_TOKEN%
+                    "%SNYK_EXE%" test --file=pom.xml --package-manager=maven --severity-threshold=high
+                    """
+                }
+            }
+        }
+
+        stage('09 - SNYK CONTAINER SCAN') {
+            steps {
+                echo "Analyse de l'image Docker avec Snyk - mode non bloquant"
+                withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
+                    bat """
+                    "%SNYK_EXE%" auth %SNYK_TOKEN%
+                    "%SNYK_EXE%" container test %DOCKER_IMAGE%:latest ^
+                    --severity-threshold=high || exit /b 0
+                    """
+                }
+            }
+        }
+
+        stage('10 - DEPLOY LOCAL') {
+            steps {
+                echo "Deploying Application"
+                bat """
+                docker stop ${APP_NAME} || exit 0
+                docker rm ${APP_NAME} || exit 0
+                docker run -d ^
+                --name ${APP_NAME} ^
+                -p 8081:8080 ^
+                ${DOCKER_IMAGE}:latest
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "========================= PIPELINE SUCCESS ========================="
+        }
+        failure {
+            echo "========================= PIPELINE FAILED ========================="
+        }
+    }
+}
