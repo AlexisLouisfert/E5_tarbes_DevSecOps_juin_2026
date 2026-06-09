@@ -1,0 +1,105 @@
+pipeline {
+
+    agent any
+
+    /* Déclaration de Maven pour l'auto-installation */
+    tools {
+        maven 'Maven3'
+    }
+
+    parameters {
+        string(name: 'NAME', defaultValue: 'DevOps User', description: 'Please tell me your name')
+        text(name: 'DESC', defaultValue: 'Pipeline CI/CD Jenkins GitHub', description: 'Description du Job')
+        booleanParam(name: 'SKIP_TEST', defaultValue: false, description: 'Skip running Tests ?')
+        choice(name: 'BRANCH', choices: ['main', 'dev', 'test'], description: 'Choose Git branch')
+    }
+
+    environment {
+        APP_NAME = "web-app"
+        DOCKER_IMAGE = "mydockerhub/web-app"
+    }
+
+    stages {
+
+        stage('01 - PRINT PARAMETERS') {
+            steps {
+                echo "Hello ${params.NAME}"
+                echo "Branch Selected : ${params.BRANCH}"
+            }
+        }
+
+        stage('02 - CHECKOUT GITHUB') {
+            steps {
+                echo "Downloading source code..."
+                git branch: "${params.BRANCH}",
+                url: 'https://github.com/AlexisLouisfert/E5_tarbes_DevSecOps_juin_2026.git'
+            }
+        }
+
+        stage('03 - BUILD APPLICATION') {
+            steps {
+                echo "Building Application"
+                bat """
+                echo Compilation en cours...
+                mvn clean package
+                """
+            }
+        }
+
+        stage('04 - RUN TESTS') {
+            when {
+                expression { return params.SKIP_TEST == false }
+            }
+            steps {
+                echo "Running Tests"
+                bat """
+                mvn test
+                """
+            }
+        }
+
+        /* NOUVELLE ÉTAPE : Scan de sécurité avec Trivy via Docker 
+        %cd% permet de donner le chemin actuel (Windows) au conteneur Trivy
+        */
+        stage('05 - TRIVY SECURITY SCAN') {
+            steps {
+                echo "Scanning for vulnerabilities with Trivy..."
+                bat """
+                docker run --rm -v "%cd%:/workspace" aquasec/trivy:latest fs /workspace
+                """
+            }
+        }
+
+        stage('06 - DOCKER BUILD') {
+            steps {
+                echo "Creating Docker image"
+                bat """
+                docker build -t ${DOCKER_IMAGE}:latest .
+                """
+            }
+        }
+
+        stage('07 - DEPLOY') {
+            steps {
+                echo "Deploying Application"
+                bat """
+                docker stop ${APP_NAME} || exit 0
+                docker rm ${APP_NAME} || exit 0
+                docker run -d ^
+                --name ${APP_NAME} ^
+                -p 8081:8080 ^
+                ${DOCKER_IMAGE}:latest
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "========================= PIPELINE SUCCESS ========================="
+        }
+        failure {
+            echo "========================= PIPELINE FAILED ========================="
+        }
+    }
+}
