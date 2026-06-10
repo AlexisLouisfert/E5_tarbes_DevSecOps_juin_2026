@@ -2,9 +2,6 @@ pipeline {
 
     agent any
 
-    /* C'EST ICI LA MAGIE : 
-    Jenkins va télécharger Maven tout seul grâce à cette ligne 
-    */
     tools {
         maven 'Maven3'
     }
