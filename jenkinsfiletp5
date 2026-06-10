@@ -2,7 +2,6 @@ pipeline {
 
     agent any
 
-    /* Déclaration de Maven pour l'auto-installation */
     tools {
         maven 'Maven3'
     }
