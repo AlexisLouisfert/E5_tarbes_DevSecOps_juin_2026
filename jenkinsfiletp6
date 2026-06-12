@@ -91,6 +91,7 @@ pipeline {
             steps {
                 echo "Analyse des failles avec Trivy (Bloquant)"
                 bat """
+                --severity HIGH,CRITICAL ^
                 "%TRIVY_EXE%" fs target
                 """
             }
